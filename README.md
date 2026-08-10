@@ -8,7 +8,7 @@
 
 *A browser-based tower defense roguelike. Two roads, one gate. Nothing may get through.*
 
-**[🌐 Play](https://filmroulette.vercel.app)** <!-- replace with actual URL if deployed -->
+**[🌐 Play](https://revision-game.vercel.app/)**
 
 </div>
 
