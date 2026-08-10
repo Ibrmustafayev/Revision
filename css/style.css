@@ -226,6 +226,11 @@ footer{width:100%;max-width:1220px;margin-top:16px;padding-top:11px;border-top:1
 #log p.cursed i{color:var(--blood)}
 
 /* ═══ armoury ═══ */
+/* The armoury opens on top of the title screen AND on top of the end-of-run
+   sheet. Both are .veil at z-index 40, so without this it loses the stacking
+   order to #over (which comes later in the HTML) and ends up buried. */
+#armoury{z-index:60}
+
 .seal-bar{display:flex;justify-content:space-between;align-items:baseline;
   border:1px solid var(--line);background:var(--bark-2);padding:10px 14px;margin-bottom:14px;
   font-size:11px;color:var(--moss);letter-spacing:.1em;text-transform:uppercase}
