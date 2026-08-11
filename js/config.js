@@ -13,7 +13,12 @@ window.RV = window.RV || {};
     ROWS: 10,
     ROAD: 50,
     NO_BUILD: 2.4,      // radius, in cells, around each spawn where you can't build
-    START_GOLD: 520
+    START_GOLD: 520,
+    SINK_WAVES: 2,        // waves an emplacement survives on swamp
+    SUNK_LOCK: 1,         // waves the square stays unusable after it goes under
+    SHORE_BASE: 0.70,     // shoring costs this share of everything invested...
+    SHORE_FLAT: 50,       // ...plus a flat fee, so it always beats a fresh build
+    SHORE_STEP: 1.35      // and 35% more each time. Swamp is never a home.
   };
   RV.CFG.W = RV.CFG.CELL * RV.CFG.COLS;   // 900
   RV.CFG.H = RV.CFG.CELL * RV.CFG.ROWS;   // 600
@@ -24,11 +29,14 @@ window.RV = window.RV || {};
      overlap from the junction onward — that IS the merge. */
   RV.MAPS = [
     { lanes: [ [[-1, 1], [3, 1], [3, 3], [8, 3], [8, 5], [15, 5]],
-               [[-1, 8], [3, 8], [3, 7], [8, 7], [8, 5], [15, 5]] ], exit: [14, 5] },
+               [[-1, 8], [3, 8], [3, 7], [8, 7], [8, 5], [15, 5]] ], exit: [14, 5],
+      swamp: [[5,5],[6,5],[7,5],[6,4],[7,4],[6,6],[7,6],[9,4],[9,6]] },
     { lanes: [ [[-1, 2], [2, 2], [2, 5], [6, 5], [6, 2], [10, 2], [10, 4], [15, 4]],
-               [[-1, 7], [4, 7], [4, 9], [8, 9], [8, 6], [10, 6], [10, 4], [15, 4]] ], exit: [14, 4] },
+               [[-1, 7], [4, 7], [4, 9], [8, 9], [8, 6], [10, 6], [10, 4], [15, 4]] ], exit: [14, 4],
+      swamp: [[8,4],[8,5],[9,3],[9,4],[9,5],[11,3],[11,5],[12,3],[12,5]] },
     { lanes: [ [[-1, 4], [3, 4], [3, 1], [7, 1], [7, 6], [15, 6]],
-               [[-1, 9], [3, 9], [3, 7], [7, 7], [7, 6], [15, 6]] ], exit: [14, 6] }
+               [[-1, 9], [3, 9], [3, 7], [7, 7], [7, 6], [15, 6]] ], exit: [14, 6],
+      swamp: [[5,5],[6,5],[5,6],[6,6],[6,4],[8,5],[9,5],[8,7],[9,7]] }
   ];
 
   /* ---- emplacements ------------------------------------------------ */
@@ -78,7 +86,19 @@ window.RV = window.RV || {};
     /* takes 85% reduced damage until a Cryo shot strips the ward */
     warded: { hpMul: 1.15, speedMul: 0.90, rewardMul: 1.7, r: 16, color: "#4a6fa5",
               wardCut: 0.15, wardDown: 4.5, armMul: 1.3 },
+    /* alien-touched thrall — its death throws an EMP over your crews */
+    reson:  { hpMul: 1.45, speedMul: 1.05, rewardMul: 1.8, r: 16, color: "#5fd6c0",
+              armMul: 0.9, empRadius: 175, empStun: 2.0 },
     boss:   { hpMul: 11,   speedMul: 0.52, rewardMul: 11,  r: 28, color: "#a52f3f", armMul: 2.4 }
+  };
+
+  /* The Harvester hangs above the field and reaches down. Both strikes are
+     telegraphed — an untelegraphed instant loss reads as arbitrary, not hard. */
+  RV.STRIKES = {
+    zone: { from: 6,  chance: 0.38, warn: 2.6, span: 1,   damage: 0.55,
+            label: "HARVEST BEAM" },
+    line: { from: 11, chance: 0.22, warn: 2.9, half: 34,  damage: 0.92,
+            label: "LANCE BEAM" }
   };
 
   /* warlords alternate between two kits */
