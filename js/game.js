@@ -9,7 +9,8 @@ window.RV = window.RV || {};
 
   var S = RV.S = {
     G: null, M: null, W: null,
-    lanes: [], blocked: new Set(), noBuild: new Set(), props: [], exit: [0, 0],
+    lanes: [], blocked: new Set(), noBuild: new Set(), swamp: new Set(),
+    sunk: {}, props: [], exit: [0, 0], strike: null, waveTime: 0,
     terrain: null,
     enemies: [], towers: [], shots: [], bits: [], floats: [], corpses: [], rings: [],
     phase: "title", prevPhase: "build", spawner: null,
@@ -41,6 +42,12 @@ window.RV = window.RV || {};
     return Math.max(5, Math.round(t.spent * 0.45 * (1 - t.hpPct) * S.M.repair));
   }
   function isStunned(t) { return t.stunUntil > S.tick; }
+  function onSwamp(c, r) { return S.swamp.has(RV.key(c, r)); }
+  function shorePrice(t) {
+    if (!t.swamp) return null;
+    return Math.round((t.spent * CFG.SHORE_BASE + CFG.SHORE_FLAT) *
+                      Math.pow(CFG.SHORE_STEP, t.shored || 0));
+  }
 
   /* ---- setup -------------------------------------------------------- */
   function reset() {
@@ -83,13 +90,22 @@ window.RV = window.RV || {};
             S.noBuild.add(RV.key(c, r));
     });
 
+    /* Swamp: buildable, but it eats what you put on it. Authored around the
+       merge — the ground you most want and can least afford to lose. */
+    S.swamp = new Set();
+    S.sunk = {};
+    (map.swamp || []).forEach(function (c) {
+      var k = RV.key(c[0], c[1]);
+      if (!S.blocked.has(k) && !S.noBuild.has(k)) S.swamp.add(k);
+    });
+
     /* scenery that also blocks building */
     S.props = [];
     var taken = new Set(), tries = 0;
     while (S.props.length < 11 && tries < 500) {
       tries++;
       var pc = (rng() * CFG.COLS) | 0, pr = (rng() * CFG.ROWS) | 0, k = RV.key(pc, pr);
-      if (S.blocked.has(k) || taken.has(k)) continue;
+      if (S.blocked.has(k) || taken.has(k) || S.swamp.has(k)) continue;
       var nearRoad = false;
       for (var dc = -1; dc <= 1; dc++)
         for (var dr = -1; dr <= 1; dr++)
@@ -108,6 +124,7 @@ window.RV = window.RV || {};
     S.selected = null; S.picked = null; S.hover = null; S.spawner = null;
     S.revision = 0; S.shake = 0; S.flash = 0; S.rate = 1; S.tick = 0;
     S.pendingDrafts = 0; S.takenContract = null;
+    S.strike = null; S.waveTime = 0;
     S.shownGold = S.G.gold;
     S.phase = "build";
     offerContract();
@@ -157,6 +174,25 @@ window.RV = window.RV || {};
             sappers: false, extraBoss: false, allWarded: false };
     if (S.takenContract) S.takenContract.apply(S.W);
 
+    /* swamp: everything standing on it settles one wave deeper */
+    for (var sk in S.sunk) {
+      S.sunk[sk] -= 1;
+      if (S.sunk[sk] <= 0) delete S.sunk[sk];
+    }
+    for (var sw = S.towers.length - 1; sw >= 0; sw--) {
+      var st_ = S.towers[sw];
+      if (!st_.swamp) continue;
+      st_.sinkIn -= 1;
+      if (st_.sinkIn <= 0) sinkTower(sw);
+    }
+
+    /* the Harvester picks its moment */
+    S.waveTime = 0;
+    S.strike = null;
+    var Z = RV.STRIKES.zone, L = RV.STRIKES.line;
+    if (S.G.wave >= L.from && Math.random() < L.chance)      S.strike = newStrike("line", L);
+    else if (S.G.wave >= Z.from && Math.random() < Z.chance) S.strike = newStrike("zone", Z);
+
     /* curses that bite at the start of every wave */
     if (S.M.waveDecay > 0) {
       for (var d = S.towers.length - 1; d >= 0; d--) {
@@ -182,6 +218,7 @@ window.RV = window.RV || {};
         if (S.G.wave >= 4 && i % 4 === 1) kind = "sapper";
         if (S.G.wave >= 5 && i % 7 === 6) kind = "brood";
         if (S.G.wave >= 6 && i % 9 === 8) kind = "warded";
+        if (S.G.wave >= 7 && i % 6 === 3) kind = "reson";
         if (S.W.sappers && i % 2 === 0) kind = "sapper";
         q.push(kind);
       }
@@ -303,6 +340,51 @@ window.RV = window.RV || {};
     }
   }
 
+  function sinkTower(index) {
+    var t = S.towers[index];
+    S.sunk[RV.key(t.c, t.r)] = CFG.SUNK_LOCK;
+    burst(t.x, t.y + 10, 20, "#4b6b45", 3, 90);
+    addFloat(t.x, t.y - 30, "SWALLOWED", "#6f8f5a", 1.3, 13);
+    if (S.picked === t) S.picked = null;
+    S.towers.splice(index, 1);
+    S.G.lost++;
+    S.G.sunk = (S.G.sunk || 0) + 1;
+    kick(7);
+    RV.Sfx.crumble();
+  }
+
+  function shore(t) {
+    if (!t || !t.swamp) return false;
+    var price = shorePrice(t);
+    if (S.G.gold < price) return false;
+    S.G.gold -= price;
+    t.spent += Math.round(price * 0.4);
+    t.shored = (t.shored || 0) + 1;
+    t.sinkIn = CFG.SINK_WAVES;
+    RV.Sfx.repair();
+    addFloat(t.x, t.y - 30, "SHORED UP", "#8dc26f", 1.0, 12);
+    return true;
+  }
+
+  /* EMP: silences nearby crews rather than killing them. Punishes clustering,
+     which pulls directly against the sapper — that tension is the point. */
+  function resonate(e) {
+    var spec = ENEMIES.reson;
+    S.rings.push({ x: e.x, y: e.y, r: 8, max: spec.empRadius,
+                   life: 0.5, maxLife: 0.5, color: "#5fd6c0" });
+    burst(e.x, e.y, 22, "#5fd6c0", 3, 190);
+    kick(9);
+    RV.Sfx.blast();
+    var hit_ = 0;
+    for (var i = 0; i < S.towers.length; i++) {
+      var t = S.towers[i];
+      if (Math.hypot(t.x - e.x, t.y - e.y) > spec.empRadius) continue;
+      t.stunUntil = Math.max(t.stunUntil, S.tick + spec.empStun);
+      hit_++;
+    }
+    if (hit_) addFloat(e.x, e.y - 34, hit_ + " SILENCED", "#5fd6c0", 1.1, 13);
+  }
+
   function destroyTower(index) {
     var t = S.towers[index];
     burst(t.x, t.y, 22, "#8a8578", 3, 150);
@@ -360,6 +442,7 @@ window.RV = window.RV || {};
           e.color, e.kind === "boss" ? 4 : 2.6, 160);
 
     if (e.kind === "sapper") detonate(e);
+    else if (e.kind === "reson") resonate(e);
     else if (e.kind === "brood" && e.gen < ENEMIES.brood.maxGen) split(e);
     else if (e.kind === "boss") { kick(16); RV.Sfx.boom(); }
     else RV.Sfx.kill();
@@ -375,6 +458,70 @@ window.RV = window.RV || {};
       S.enemies.push(child);
     }
     burst(e.x, e.y, 12, "#8fd6a0", 2.4, 130);
+  }
+
+  /* ---- the Harvester ------------------------------------------------------ */
+  function newStrike(kind, cfg) {
+    var s_ = { kind: kind, cfg: cfg, at: 3.0 + Math.random() * 5.0,
+               state: "waiting", t: 0 };
+    if (kind === "zone") {
+      /* aim where you actually built — the beam hunts clusters */
+      var target = S.towers.length
+        ? S.towers[(Math.random() * S.towers.length) | 0]
+        : { c: 4 + ((Math.random() * 7) | 0), r: 2 + ((Math.random() * 6) | 0) };
+      s_.c = RV.clamp(target.c, cfg.span, CFG.COLS - 1 - cfg.span);
+      s_.r = RV.clamp(target.r, cfg.span, CFG.ROWS - 1 - cfg.span);
+    } else {
+      /* a lance drawn from an edge through to the gate */
+      var edge = Math.random();
+      s_.ax = edge < 0.5 ? -40 : RV.cx((Math.random() * CFG.COLS) | 0);
+      s_.ay = edge < 0.5 ? RV.cy((Math.random() * CFG.ROWS) | 0)
+                         : (Math.random() < 0.5 ? -40 : CFG.H + 40);
+      s_.bx = RV.cx(S.exit[0]); s_.by = RV.cy(S.exit[1]);
+    }
+    return s_;
+  }
+
+  function strikeTick(dt) {
+    var k = S.strike;
+    if (!k) return;
+    if (k.state === "waiting") {
+      if (S.waveTime >= k.at) { k.state = "warning"; k.t = 0; RV.Sfx.wave(); }
+      return;
+    }
+    k.t += dt;
+    if (k.state === "warning") {
+      if (k.t >= k.cfg.warn) { k.state = "firing"; k.t = 0; fireStrike(k); }
+      return;
+    }
+    if (k.t > 0.7) S.strike = null;
+  }
+
+  function inStrike(k, t) {
+    if (k.kind === "zone") {
+      return Math.abs(t.c - k.c) <= k.cfg.span && Math.abs(t.r - k.r) <= k.cfg.span;
+    }
+    var vx = k.bx - k.ax, vy = k.by - k.ay;
+    var len2 = vx * vx + vy * vy;
+    var u = RV.clamp(((t.x - k.ax) * vx + (t.y - k.ay) * vy) / len2, 0, 1);
+    return Math.hypot(t.x - (k.ax + vx * u), t.y - (k.ay + vy * u)) <= k.cfg.half;
+  }
+
+  function fireStrike(k) {
+    kick(k.kind === "line" ? 22 : 16);
+    S.flash = 0.22;
+    RV.Sfx.boom();
+    for (var i = S.towers.length - 1; i >= 0; i--) {
+      var t = S.towers[i];
+      if (!inStrike(k, t)) continue;
+      var max = towerStats(t).maxHp;
+      var dmg = max * k.cfg.damage;
+      t.hpPct = Math.max(0, t.hpPct - k.cfg.damage);
+      t.hurt = 0.5;
+      addFloat(t.x, t.y - 28, "-" + Math.round(dmg), "#7dffb0", 0.9, 13);
+      burst(t.x, t.y, 16, "#7dffb0", 3, 150);
+      if (t.hpPct <= 0) destroyTower(i);
+    }
   }
 
   /* ---- boss kits -------------------------------------------------------- */
@@ -415,6 +562,8 @@ window.RV = window.RV || {};
   /* ---- main step --------------------------------------------------------- */
   function update(dt) {
     S.tick += dt;
+    S.waveTime += dt;
+    strikeTick(dt);
 
     if (S.spawner) {
       var pending = 0;
@@ -584,7 +733,7 @@ window.RV = window.RV || {};
   function canPlace(c, r, type) {
     if (!type || !S.G.unlocked[type]) return false;
     var k = RV.key(c, r);
-    if (S.blocked.has(k) || S.noBuild.has(k)) return false;
+    if (S.blocked.has(k) || S.noBuild.has(k) || S.sunk[k]) return false;
     for (var i = 0; i < S.towers.length; i++)
       if (S.towers[i].c === c && S.towers[i].r === r) return false;
     return S.G.gold >= buildPrice(type);
@@ -598,7 +747,8 @@ window.RV = window.RV || {};
     var t = { c: c, r: r, x: RV.cx(c), y: RV.cy(r), type: type,
               tier: 1, spent: price, cd: 0, angle: -Math.PI / 2,
               flash: 0, recoil: 0, hurt: 0, hpPct: 1,
-              mode: "first", stunUntil: -1 };
+              mode: "first", stunUntil: -1,
+              swamp: onSwamp(c, r), sinkIn: CFG.SINK_WAVES, shored: 0 };
     S.towers.push(t);
     burst(t.x, t.y + 12, 10, "#9c8b6a", 2.5, 60);
     RV.Sfx.place();
@@ -660,6 +810,7 @@ window.RV = window.RV || {};
     towerStats: towerStats, buildPrice: buildPrice, upgradePrice: upgradePrice,
     sellValue: sellValue, repairPrice: repairPrice, isStunned: isStunned,
     canPlace: canPlace, place: place, upgrade: upgrade, repair: repair,
+    shore: shore, shorePrice: shorePrice, onSwamp: onSwamp,
     sell: sell, cycleMode: cycleMode, towerAt: towerAt,
     takeCard: takeCard, consumeDraft: consumeDraft,
     offerContract: offerContract, signContract: signContract,
