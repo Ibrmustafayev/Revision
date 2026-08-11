@@ -13,9 +13,10 @@ window.RV = window.RV || {};
     var spec = TOWERS[t.type];
     var bob = Math.sin(S.tick * 1.4 + t.c) * 0.6;
     var stunned = RV.Game.isStunned(t);
+    var settle = t.swamp ? (1 - t.sinkIn / RV.CFG.SINK_WAVES) * 7 : 0;
 
     ctx.save();
-    ctx.translate(t.x, t.y + bob);
+    ctx.translate(t.x, t.y + bob + settle);
 
     ctx.fillStyle = "rgba(12,26,10,.38)";
     ctx.beginPath(); ctx.ellipse(3, 18, 24, 10, 0, 0, Math.PI * 2); ctx.fill();
@@ -101,7 +102,7 @@ window.RV = window.RV || {};
     /* silenced: crackling violet arcs over the emplacement */
     if (stunned) {
       ctx.save();
-      ctx.translate(t.x, t.y + bob);
+      ctx.translate(t.x, t.y + bob + settle);
       ctx.strokeStyle = "rgba(200,111,208,.85)";
       ctx.lineWidth = 1.8;
       for (var z = 0; z < 3; z++) {
@@ -112,6 +113,22 @@ window.RV = window.RV || {};
         ctx.lineTo(Math.cos(sa + 2.4) * 20, Math.sin(sa + 2.4) * 15);
         ctx.stroke();
       }
+      ctx.restore();
+    }
+
+    /* swamp waterline + sink countdown */
+    if (t.swamp) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(140,200,160,.55)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(t.x, t.y + 16 + settle, 26, 9, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = t.sinkIn <= 1 ? "rgba(200,67,59,.92)" : "rgba(140,200,160,.85)";
+      ctx.font = "600 10px 'IBM Plex Mono',monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(t.sinkIn <= 1 ? "SINKING" : "SINKS IN " + t.sinkIn, t.x, t.y + 44 + settle);
+      ctx.textAlign = "left";
       ctx.restore();
     }
 
@@ -194,6 +211,33 @@ window.RV = window.RV || {};
       ctx.beginPath(); ctx.arc(r * 0.5, -r * 1.38, r * 0.24 * spark + 1.5, 0, Math.PI * 2); ctx.fill();
       ctx.globalCompositeOperation = "source-over";
 
+    } else if (kind === "reson") {
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.92);
+      ctx.quadraticCurveTo(r * 0.8, -r * 0.25, r * 0.58, r * 0.5);
+      ctx.lineTo(-r * 0.58, r * 0.5);
+      ctx.quadraticCurveTo(-r * 0.8, -r * 0.25, 0, -r * 0.92);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = dark; ctx.lineWidth = 1.8; ctx.stroke();
+      /* the thing bolted into its chest */
+      var hum = 0.55 + Math.abs(Math.sin(phaseT * 2.2)) * 0.45;
+      ctx.strokeStyle = "rgba(150,255,230," + hum + ")";
+      ctx.lineWidth = 2;
+      for (var q = 0; q < 3; q++) {
+        ctx.beginPath();
+        ctx.arc(0, -r * 0.1, r * (0.22 + q * 0.16), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(210,255,245," + hum + ")";
+      ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 0.15, 0, Math.PI * 2); ctx.fill();
+      var hy2 = -r * 0.78;
+      ctx.beginPath(); ctx.arc(0, hy2, r * 0.34, 0, Math.PI * 2);
+      ctx.fillStyle = flash ? "#ffffff" : dark; ctx.fill();
+      ctx.fillStyle = "rgba(180,255,240,.95)";
+      ctx.beginPath(); ctx.arc(-r * 0.14, hy2, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.14, hy2, r * 0.09, 0, Math.PI * 2); ctx.fill();
+
     } else if (kind === "brood") {
       /* lumpy sac with visible smaller shapes inside — it reads as "full of more" */
       ctx.fillStyle = body;
@@ -223,7 +267,7 @@ window.RV = window.RV || {};
       ctx.strokeStyle = dark; ctx.lineWidth = 1.8; ctx.stroke();
     }
 
-    if (kind !== "sapper" && kind !== "brood") {
+    if (kind !== "sapper" && kind !== "brood" && kind !== "reson") {
       var hy = -r * 0.75;
       ctx.beginPath(); ctx.arc(0, hy, r * (kind === "boss" ? 0.44 : 0.36), 0, Math.PI * 2);
       ctx.fillStyle = flash ? "#ffffff" : dark; ctx.fill();
@@ -263,11 +307,12 @@ window.RV = window.RV || {};
     ctx.ellipse(e.x + 2, e.y + e.r * 0.95, e.r * 0.85, e.r * 0.34, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    if (e.kind === "boss" || e.kind === "sapper") {
+    if (e.kind === "boss" || e.kind === "sapper" || e.kind === "reson") {
       ctx.globalCompositeOperation = "lighter";
       var gr = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 2);
       gr.addColorStop(0, e.kind === "boss"
         ? (e.boss === "herald" ? "rgba(140,60,180,.3)" : "rgba(200,60,70,.28)")
+        : e.kind === "reson" ? "rgba(95,214,192,.3)"
         : "rgba(230,140,40,.24)");
       gr.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = gr;
@@ -317,6 +362,107 @@ window.RV = window.RV || {};
   }
 
   /* ---- overlays -------------------------------------------------------- */
+  function drawSwamp() {
+    var C = CFG.CELL;
+    S.swamp.forEach(function (k) {
+      var p = k.split(","), x = +p[0] * C, y = +p[1] * C;
+      var sunk = !!S.sunk[k];
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, C, C); ctx.clip();
+      ctx.fillStyle = sunk ? "rgba(22,44,34,.86)" : "rgba(34,58,42,.7)";
+      ctx.fillRect(x, y, C, C);
+      /* standing water: slow concentric ripples */
+      for (var i = 0; i < 5; i++) {
+        var ph = (S.tick * 0.35 + i * 0.2 + (+p[0] + +p[1]) * 0.13) % 1;
+        ctx.beginPath();
+        ctx.ellipse(x + C * 0.5, y + C * 0.55, C * 0.14 + ph * C * 0.42,
+                    C * 0.07 + ph * C * 0.2, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(120,190,150," + (0.2 * (1 - ph)) + ")";
+        ctx.lineWidth = 1.4; ctx.stroke();
+      }
+      /* reeds along the edges */
+      for (var g = 0; g < 7; g++) {
+        var gx = x + 5 + ((g * 37 + (+p[0] * 17)) % (C - 10));
+        var gy = y + C - 4 - ((g * 23) % 10);
+        var sway = Math.sin(S.tick * 1.3 + g + +p[1]) * 2.4;
+        ctx.strokeStyle = "rgba(96,140,80,.55)"; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + sway, gy - 11 - (g % 3) * 4);
+        ctx.stroke();
+      }
+      if (sunk) {
+        ctx.fillStyle = "rgba(150,200,170,.5)";
+        for (var b = 0; b < 4; b++) {
+          var bt = (S.tick * 0.6 + b * 0.25) % 1;
+          ctx.beginPath();
+          ctx.arc(x + C * (0.28 + b * 0.16), y + C * (0.85 - bt * 0.55),
+                  1.6 + bt * 2.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+      ctx.strokeStyle = sunk ? "rgba(120,190,150,.4)" : "rgba(120,190,150,.22)";
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x + 0.7, y + 0.7, C - 1.4, C - 1.4);
+    });
+  }
+
+  /* The Harvester telegraphs for ~2.5s before it fires. An untelegraphed
+     instant loss reads as arbitrary; a warned one reads as a decision. */
+  function drawStrike() {
+    var k = S.strike;
+    if (!k || k.state === "waiting") return;
+    var C = CFG.CELL;
+    var warming = k.state === "warning";
+    var p = warming ? k.t / k.cfg.warn : 1;
+    var pulse = 0.35 + Math.abs(Math.sin(S.tick * (warming ? 6 + p * 10 : 30))) * 0.65;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+
+    if (k.kind === "zone") {
+      var x = (k.c - k.cfg.span) * C, y = (k.r - k.cfg.span) * C;
+      var w = (k.cfg.span * 2 + 1) * C, h = w;
+      ctx.fillStyle = "rgba(90,255,170," + (warming ? 0.06 + p * 0.16 : 0.55) + ")";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = "rgba(140,255,190," + pulse + ")";
+      ctx.lineWidth = warming ? 3 : 6;
+      ctx.strokeRect(x, y, w, h);
+      /* converging cross-hair */
+      var inset = warming ? (1 - p) * w * 0.4 : 0;
+      ctx.strokeStyle = "rgba(190,255,215," + pulse + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + inset, y + h / 2); ctx.lineTo(x + w - inset, y + h / 2);
+      ctx.moveTo(x + w / 2, y + inset); ctx.lineTo(x + w / 2, y + h - inset);
+      ctx.stroke();
+      if (!warming) {
+        var col = ctx.createLinearGradient(0, y, 0, y + h);
+        col.addColorStop(0, "rgba(150,255,200,.9)");
+        col.addColorStop(1, "rgba(150,255,200,0)");
+        ctx.fillStyle = col;
+        ctx.fillRect(x + w * 0.12, 0, w * 0.76, y + h);
+      }
+    } else {
+      ctx.strokeStyle = "rgba(140,255,190," + (warming ? 0.25 + p * 0.5 : 1) + ")";
+      ctx.lineWidth = warming ? 2 + p * 4 : k.cfg.half * 2;
+      ctx.beginPath(); ctx.moveTo(k.ax, k.ay); ctx.lineTo(k.bx, k.by); ctx.stroke();
+      ctx.strokeStyle = "rgba(230,255,240," + pulse + ")";
+      ctx.lineWidth = warming ? 1.5 : 8;
+      ctx.beginPath(); ctx.moveTo(k.ax, k.ay); ctx.lineTo(k.bx, k.by); ctx.stroke();
+    }
+    ctx.restore();
+
+    if (warming) {
+      ctx.fillStyle = "rgba(12,20,10,.72)";
+      ctx.fillRect(0, 8, CFG.W, 30);
+      ctx.fillStyle = "rgba(140,255,190," + pulse + ")";
+      ctx.font = "600 15px 'IBM Plex Mono',monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("\u25B2 HARVESTER \u2014 " + k.cfg.label + " INCOMING", CFG.W / 2, 29);
+      ctx.textAlign = "left";
+    }
+  }
+
   function drawNoBuild() {
     if (!S.selected || S.phase === "over" || S.phase === "title") return;
     var C = CFG.CELL;
@@ -373,8 +519,10 @@ window.RV = window.RV || {};
     if (S.terrain) ctx.drawImage(S.terrain, 0, 0);
     else { ctx.fillStyle = "#4a7a37"; ctx.fillRect(0, 0, W, H); }
 
+    drawSwamp();
     drawNoBuild();
     drawGhost();
+    drawStrike();
 
     for (var c = 0; c < S.corpses.length; c++) {
       var co = S.corpses[c], t = co.life / co.max;
