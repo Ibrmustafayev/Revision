@@ -10,7 +10,7 @@ window.RV = window.RV || {};
   var S = RV.S = {
     G: null, M: null, W: null,
     lanes: [], blocked: new Set(), noBuild: new Set(), swamp: new Set(),
-    sunk: {}, props: [], exit: [0, 0], strike: null, waveTime: 0,
+    sunk: {}, wrecks: [], props: [], exit: [0, 0], strike: null, waveTime: 0,
     terrain: null,
     enemies: [], towers: [], shots: [], bits: [], floats: [], corpses: [], rings: [],
     phase: "title", prevPhase: "build", spawner: null,
@@ -39,7 +39,8 @@ window.RV = window.RV || {};
   function sellValue(t)     { return S.M.noSell ? null : Math.round(t.spent * 0.6 * t.hpPct); }
   function repairPrice(t)   {
     if (S.M.noRepair || t.hpPct >= 0.999) return null;
-    return Math.max(5, Math.round(t.spent * 0.45 * (1 - t.hpPct) * S.M.repair));
+    return Math.max(8, Math.round(t.spent * 0.5 * (1 - t.hpPct) * S.M.repair *
+                                  Math.pow(CFG.REPAIR_STEP, t.repairs || 0)));
   }
   function isStunned(t) { return t.stunUntil > S.tick; }
   function onSwamp(c, r) { return S.swamp.has(RV.key(c, r)); }
@@ -90,14 +91,17 @@ window.RV = window.RV || {};
             S.noBuild.add(RV.key(c, r));
     });
 
-    /* Swamp: buildable, but it eats what you put on it. Authored around the
-       merge — the ground you most want and can least afford to lose. */
+    /* Swamp: the marsh down the left edge. Buildable, but it eats what you
+       put on it. Roads run through it as raised causeways and stay dry. */
     S.swamp = new Set();
     S.sunk = {};
-    (map.swamp || []).forEach(function (c) {
-      var k = RV.key(c[0], c[1]);
-      if (!S.blocked.has(k) && !S.noBuild.has(k)) S.swamp.add(k);
-    });
+    S.wrecks = [];
+    for (var sc = 0; sc < CFG.SWAMP_COLS; sc++) {
+      for (var sr = 0; sr < CFG.ROWS; sr++) {
+        var sk = RV.key(sc, sr);
+        if (!S.blocked.has(sk)) S.swamp.add(sk);
+      }
+    }
 
     /* scenery that also blocks building */
     S.props = [];
@@ -117,7 +121,7 @@ window.RV = window.RV || {};
     }
     S.props.forEach(function (p) { S.blocked.add(RV.key(p.c, p.r)); });
 
-    S.terrain = RV.Terrain.paint(seed, S.lanes, S.blocked, S.props, S.exit);
+    S.terrain = RV.Terrain.paint(seed, S.lanes, S.blocked, S.props, S.exit, S.swamp);
 
     S.enemies = []; S.towers = []; S.shots = [];
     S.bits = []; S.floats = []; S.corpses = []; S.rings = [];
@@ -158,7 +162,7 @@ window.RV = window.RV || {};
          Held at zero for the first few waves so the opening stays fair. */
       armor: Math.max(0, (n - 5) * 0.45),
       speed: 50 + n * 1.3,
-      reward: 11 + Math.floor(n * 1.0),
+      reward: 9 + Math.floor(n * 0.62),
       gap: Math.max(0.22, 0.86 - n * 0.024),
       boss: n % 5 === 0 || (n >= 20 && n % 3 === 0)
     };
@@ -183,13 +187,14 @@ window.RV = window.RV || {};
       var st_ = S.towers[sw];
       if (!st_.swamp) continue;
       st_.sinkIn -= 1;
-      if (st_.sinkIn <= 0) sinkTower(sw);
+      if (st_.sinkIn <= 0 && !st_.sinking) { st_.sinking = 1.6; RV.Sfx.crumble(); }
     }
 
     /* the Harvester picks its moment */
     S.waveTime = 0;
     S.strike = null;
     var Z = RV.STRIKES.zone, L = RV.STRIKES.line;
+    S.strike = null;
     if (S.G.wave >= L.from && Math.random() < L.chance)      S.strike = newStrike("line", L);
     else if (S.G.wave >= Z.from && Math.random() < Z.chance) S.strike = newStrike("zone", Z);
 
@@ -340,17 +345,37 @@ window.RV = window.RV || {};
     }
   }
 
+  /* Once it goes under it leaves a wreck: beams and iron riding the water
+     until the ground firms up again. */
   function sinkTower(index) {
     var t = S.towers[index];
-    S.sunk[RV.key(t.c, t.r)] = CFG.SUNK_LOCK;
-    burst(t.x, t.y + 10, 20, "#4b6b45", 3, 90);
+    var k = RV.key(t.c, t.r);
+    S.sunk[k] = CFG.SUNK_LOCK;
+    S.wrecks.push({ key: k, x: t.x, y: t.y, age: 0,
+                    color: TOWERS[t.type].color, tier: t.tier,
+                    bits: makeWreckBits() });
+    burst(t.x, t.y + 10, 24, "#4b6b45", 3, 90);
+    burst(t.x, t.y + 10, 14, "#8fb08a", 2.4, 140);
     addFloat(t.x, t.y - 30, "SWALLOWED", "#6f8f5a", 1.3, 13);
     if (S.picked === t) S.picked = null;
     S.towers.splice(index, 1);
     S.G.lost++;
     S.G.sunk = (S.G.sunk || 0) + 1;
-    kick(7);
+    kick(9);
     RV.Sfx.crumble();
+  }
+
+  function makeWreckBits() {
+    var out = [];
+    for (var i = 0; i < 5; i++) {
+      out.push({ kind: i < 3 ? "beam" : "iron",
+                 ox: (Math.random() - 0.5) * 34,
+                 oy: (Math.random() - 0.5) * 20,
+                 len: 14 + Math.random() * 16,
+                 rot: Math.random() * Math.PI,
+                 ph: Math.random() * 6.28 });
+    }
+    return out;
   }
 
   function shore(t) {
@@ -360,7 +385,7 @@ window.RV = window.RV || {};
     S.G.gold -= price;
     t.spent += Math.round(price * 0.4);
     t.shored = (t.shored || 0) + 1;
-    t.sinkIn = CFG.SINK_WAVES;
+    t.sinkIn = CFG.SINK_WAVES;   /* a full two waves again, every time */
     RV.Sfx.repair();
     addFloat(t.x, t.y - 30, "SHORED UP", "#8dc26f", 1.0, 12);
     return true;
@@ -603,8 +628,20 @@ window.RV = window.RV || {};
     }
 
     /* towers */
-    for (var ti = 0; ti < S.towers.length; ti++) {
+    for (var wk = S.wrecks.length - 1; wk >= 0; wk--) {
+      S.wrecks[wk].age += dt;
+      if (!S.sunk[S.wrecks[wk].key] && S.wrecks[wk].age > 1.2) S.wrecks.splice(wk, 1);
+    }
+
+    for (var ti = S.towers.length - 1; ti >= 0; ti--) {
       var tw = S.towers[ti];
+      if (tw.sinking > 0) {
+        tw.sinking -= dt;
+        if (Math.random() < dt * 12)
+          burst(tw.x + (Math.random() - .5) * 26, tw.y + 14, 2, "#9fc0a0", 2, 40);
+        if (tw.sinking <= 0) sinkTower(ti);
+        continue;
+      }
       if (tw.flash > 0) tw.flash -= dt;
       if (tw.hurt > 0) tw.hurt -= dt;
       if (tw.recoil > 0) tw.recoil = Math.max(0, tw.recoil - dt * 6);
@@ -748,7 +785,8 @@ window.RV = window.RV || {};
               tier: 1, spent: price, cd: 0, angle: -Math.PI / 2,
               flash: 0, recoil: 0, hurt: 0, hpPct: 1,
               mode: "first", stunUntil: -1,
-              swamp: onSwamp(c, r), sinkIn: CFG.SINK_WAVES, shored: 0 };
+              swamp: onSwamp(c, r), sinkIn: CFG.SINK_WAVES, shored: 0,
+              repairs: 0, sinking: 0 };
     S.towers.push(t);
     burst(t.x, t.y + 12, 10, "#9c8b6a", 2.5, 60);
     RV.Sfx.place();
@@ -773,6 +811,7 @@ window.RV = window.RV || {};
     if (price === null || S.G.gold < price) return false;
     S.G.gold -= price;
     t.spent += Math.round(price * 0.5);
+    t.repairs = (t.repairs || 0) + 1;
     t.hpPct = 1;
     RV.Sfx.repair();
     addFloat(t.x, t.y - 28, "REPAIRED", "#8dc26f", 0.95, 12);
