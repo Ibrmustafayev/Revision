@@ -101,7 +101,7 @@ window.RV = window.RV || {};
   }
 
   RV.Terrain = {
-    paint: function (seed, lanes, blocked, props, exit) {
+    paint: function (seed, lanes, blocked, props, exit, swamp) {
       var W = CFG.W, H = CFG.H;
       var off = document.createElement("canvas");
       off.width = W; off.height = H;
@@ -132,6 +132,98 @@ window.RV = window.RV || {};
         g.moveTo(bx, by);
         g.lineTo(bx + (rng() - 0.5) * 3, by - 2 - rng() * 5);
         g.stroke();
+      }
+
+      /* ── the marsh ──────────────────────────────────────────────────────
+         Drawn as overlapping organic blobs rather than per-cell squares, so
+         the boundary is irregular and it reads as one body of water instead
+         of a tile mask. Roads go down afterwards and stay dry on top. */
+      if (swamp && swamp.size) {
+        var cells = [];
+        swamp.forEach(function (k) {
+          var q = k.split(",");
+          cells.push([+q[0], +q[1]]);
+        });
+        var C = CFG.CELL;
+
+        function blobs(pad, col, jitter) {
+          cells.forEach(function (c) {
+            var bx = c[0] * C + C / 2, by = c[1] * C + C / 2;
+            for (var b = 0; b < 3; b++) {
+              var rx = C * (0.62 + rng() * 0.30) + pad;
+              var ry = C * (0.58 + rng() * 0.30) + pad;
+              var ox = (rng() - 0.5) * C * jitter, oy = (rng() - 0.5) * C * jitter;
+              g.beginPath();
+              g.ellipse(bx + ox, by + oy, rx, ry, rng() * 3, 0, Math.PI * 2);
+              g.fillStyle = col;
+              g.fill();
+            }
+          });
+        }
+
+        blobs(C * 0.16, "rgba(58,74,44,.85)", 0.34);   // wet mud shore
+        blobs(0,         "rgba(38,60,46,.92)", 0.26);   // water body
+        blobs(-C * 0.20, "rgba(28,50,44,.85)", 0.22);   // deeper channels
+
+        /* silt streaks and light on the surface */
+        for (var si = 0; si < 900; si++) {
+          var c2 = cells[(rng() * cells.length) | 0];
+          var px = c2[0] * C + rng() * C, py = c2[1] * C + rng() * C;
+          var v2 = rng();
+          g.strokeStyle = v2 < 0.45 ? "rgba(96,132,104,.30)"
+                        : v2 < 0.8  ? "rgba(24,44,38,.35)"
+                                    : "rgba(150,190,160,.22)";
+          g.lineWidth = 1;
+          g.beginPath();
+          g.moveTo(px, py);
+          g.lineTo(px + (rng() - 0.3) * 22, py + (rng() - 0.5) * 5);
+          g.stroke();
+        }
+
+        /* algae mats */
+        for (var am = 0; am < 90; am++) {
+          var c3 = cells[(rng() * cells.length) | 0];
+          var ax = c3[0] * C + rng() * C, ay = c3[1] * C + rng() * C;
+          g.beginPath();
+          g.ellipse(ax, ay, 5 + rng() * 16, 3 + rng() * 8, rng() * 3, 0, Math.PI * 2);
+          g.fillStyle = "rgba(96,140,86,.28)";
+          g.fill();
+        }
+
+        /* reeds, thickest along the shoreline */
+        cells.forEach(function (c) {
+          var edge = !swamp.has(RV.key(c[0] + 1, c[1])) ||
+                     !swamp.has(RV.key(c[0], c[1] + 1)) ||
+                     !swamp.has(RV.key(c[0], c[1] - 1));
+          var n = edge ? 16 : 6;
+          for (var r2 = 0; r2 < n; r2++) {
+            var rx2 = c[0] * C + rng() * C, ry2 = c[1] * C + rng() * C;
+            var hgt = 10 + rng() * 20;
+            g.strokeStyle = rng() < 0.5 ? "rgba(104,140,74,.62)" : "rgba(74,104,58,.6)";
+            g.lineWidth = 1.6;
+            g.beginPath();
+            g.moveTo(rx2, ry2);
+            g.quadraticCurveTo(rx2 + (rng() - 0.5) * 8, ry2 - hgt * 0.6,
+                               rx2 + (rng() - 0.5) * 13, ry2 - hgt);
+            g.stroke();
+          }
+        });
+
+        /* dead timber half-sunk in the shallows */
+        for (var lg = 0; lg < 14; lg++) {
+          var c4 = cells[(rng() * cells.length) | 0];
+          var lx = c4[0] * C + rng() * C, ly = c4[1] * C + rng() * C;
+          var la = rng() * Math.PI, ll = 14 + rng() * 26;
+          g.strokeStyle = "rgba(62,48,32,.75)";
+          g.lineWidth = 5 + rng() * 4;
+          g.beginPath();
+          g.moveTo(lx - Math.cos(la) * ll, ly - Math.sin(la) * ll * 0.5);
+          g.lineTo(lx + Math.cos(la) * ll, ly + Math.sin(la) * ll * 0.5);
+          g.stroke();
+          g.strokeStyle = "rgba(140,160,130,.22)";
+          g.lineWidth = 1.6;
+          g.stroke();
+        }
       }
 
       // roads, built up in layers
