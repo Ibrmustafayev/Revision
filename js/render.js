@@ -14,9 +14,16 @@ window.RV = window.RV || {};
     var bob = Math.sin(S.tick * 1.4 + t.c) * 0.6;
     var stunned = RV.Game.isStunned(t);
     var settle = t.swamp ? (1 - t.sinkIn / RV.CFG.SINK_WAVES) * 7 : 0;
+    var going = t.sinking > 0 ? 1 - t.sinking / 1.6 : 0;
+    settle += going * 34;
 
     ctx.save();
     ctx.translate(t.x, t.y + bob + settle);
+    if (going > 0) {
+      ctx.rotate(going * 0.26);
+      ctx.scale(1 - going * 0.18, 1 - going * 0.3);
+      ctx.globalAlpha = 1 - going * 0.55;
+    }
 
     ctx.fillStyle = "rgba(12,26,10,.38)";
     ctx.beginPath(); ctx.ellipse(3, 18, 24, 10, 0, 0, Math.PI * 2); ctx.fill();
@@ -103,6 +110,11 @@ window.RV = window.RV || {};
     if (stunned) {
       ctx.save();
       ctx.translate(t.x, t.y + bob + settle);
+    if (going > 0) {
+      ctx.rotate(going * 0.26);
+      ctx.scale(1 - going * 0.18, 1 - going * 0.3);
+      ctx.globalAlpha = 1 - going * 0.55;
+    }
       ctx.strokeStyle = "rgba(200,111,208,.85)";
       ctx.lineWidth = 1.8;
       for (var z = 0; z < 3; z++) {
@@ -117,7 +129,7 @@ window.RV = window.RV || {};
     }
 
     /* swamp waterline + sink countdown */
-    if (t.swamp) {
+    if (t.swamp && t.sinking <= 0) {
       ctx.save();
       ctx.strokeStyle = "rgba(140,200,160,.55)";
       ctx.lineWidth = 2;
@@ -363,47 +375,86 @@ window.RV = window.RV || {};
 
   /* ---- overlays -------------------------------------------------------- */
   function drawSwamp() {
+    /* The marsh itself is baked into the terrain layer so it reads as one
+       body of water. All that happens here is motion. */
     var C = CFG.CELL;
     S.swamp.forEach(function (k) {
-      var p = k.split(","), x = +p[0] * C, y = +p[1] * C;
-      var sunk = !!S.sunk[k];
-      ctx.save();
-      ctx.beginPath(); ctx.rect(x, y, C, C); ctx.clip();
-      ctx.fillStyle = sunk ? "rgba(22,44,34,.86)" : "rgba(34,58,42,.7)";
-      ctx.fillRect(x, y, C, C);
-      /* standing water: slow concentric ripples */
-      for (var i = 0; i < 5; i++) {
-        var ph = (S.tick * 0.35 + i * 0.2 + (+p[0] + +p[1]) * 0.13) % 1;
+      var p = k.split(","), cxx = +p[0] * C + C * 0.5, cyy = +p[1] * C + C * 0.5;
+      var seedn = (+p[0] * 7 + +p[1] * 13);
+      for (var i = 0; i < 2; i++) {
+        var ph = (S.tick * 0.28 + i * 0.5 + seedn * 0.11) % 1;
         ctx.beginPath();
-        ctx.ellipse(x + C * 0.5, y + C * 0.55, C * 0.14 + ph * C * 0.42,
-                    C * 0.07 + ph * C * 0.2, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = "rgba(120,190,150," + (0.2 * (1 - ph)) + ")";
-        ctx.lineWidth = 1.4; ctx.stroke();
-      }
-      /* reeds along the edges */
-      for (var g = 0; g < 7; g++) {
-        var gx = x + 5 + ((g * 37 + (+p[0] * 17)) % (C - 10));
-        var gy = y + C - 4 - ((g * 23) % 10);
-        var sway = Math.sin(S.tick * 1.3 + g + +p[1]) * 2.4;
-        ctx.strokeStyle = "rgba(96,140,80,.55)"; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + sway, gy - 11 - (g % 3) * 4);
+        ctx.ellipse(cxx, cyy, C * 0.12 + ph * C * 0.4, C * 0.06 + ph * C * 0.19,
+                    0, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(150,200,170," + (0.16 * (1 - ph)) + ")";
+        ctx.lineWidth = 1.3;
         ctx.stroke();
       }
-      if (sunk) {
-        ctx.fillStyle = "rgba(150,200,170,.5)";
+      if (S.sunk[k]) {
+        ctx.fillStyle = "rgba(170,210,185,.5)";
         for (var b = 0; b < 4; b++) {
-          var bt = (S.tick * 0.6 + b * 0.25) % 1;
+          var bt = (S.tick * 0.7 + b * 0.25 + seedn * 0.07) % 1;
           ctx.beginPath();
-          ctx.arc(x + C * (0.28 + b * 0.16), y + C * (0.85 - bt * 0.55),
-                  1.6 + bt * 2.4, 0, Math.PI * 2);
+          ctx.arc(cxx - C * 0.2 + b * C * 0.13, cyy + C * 0.3 - bt * C * 0.5,
+                  1.4 + bt * 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
       }
-      ctx.restore();
-      ctx.strokeStyle = sunk ? "rgba(120,190,150,.4)" : "rgba(120,190,150,.22)";
-      ctx.lineWidth = 1.4;
-      ctx.strokeRect(x + 0.7, y + 0.7, C - 1.4, C - 1.4);
     });
+  }
+
+  /* Beams and iron riding the water where an emplacement went under. */
+  function drawWrecks() {
+    for (var i = 0; i < S.wrecks.length; i++) {
+      var w = S.wrecks[i];
+      var settle = Math.min(1, w.age / 0.9);
+      var fade = S.sunk[w.key] ? 1 : Math.max(0, 1 - (w.age - 1.2) / 1.2);
+      if (fade <= 0) continue;
+      ctx.save();
+      ctx.globalAlpha = fade;
+      ctx.translate(w.x, w.y);
+
+      /* the slick left on the surface */
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 30 * settle, 13 * settle, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(20,38,32,.55)";
+      ctx.fill();
+
+      for (var b = 0; b < w.bits.length; b++) {
+        var bit = w.bits[b];
+        var bob = Math.sin(S.tick * 1.5 + bit.ph) * 1.8;
+        var drift = Math.sin(S.tick * 0.4 + bit.ph) * 2.5;
+        ctx.save();
+        ctx.translate(bit.ox * settle + drift, bit.oy * settle + bob + 4);
+        ctx.rotate(bit.rot + Math.sin(S.tick * 0.5 + bit.ph) * 0.06);
+        if (bit.kind === "beam") {
+          ctx.fillStyle = "#4e3a24";
+          ctx.fillRect(-bit.len / 2, -3, bit.len, 6);
+          ctx.fillStyle = "rgba(150,120,80,.55)";
+          ctx.fillRect(-bit.len / 2, -3, bit.len, 1.8);
+          ctx.strokeStyle = "rgba(20,32,26,.7)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-bit.len / 2, -3, bit.len, 6);
+        } else {
+          ctx.fillStyle = "#6b6f70";
+          ctx.beginPath();
+          ctx.moveTo(-bit.len * 0.34, -4);
+          ctx.lineTo(bit.len * 0.4, -6);
+          ctx.lineTo(bit.len * 0.3, 5);
+          ctx.lineTo(-bit.len * 0.4, 3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = w.color;
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+          ctx.fillStyle = "rgba(210,215,215,.4)";
+          ctx.fillRect(-bit.len * 0.16, -3, bit.len * 0.3, 1.6);
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
   }
 
   /* The Harvester telegraphs for ~2.5s before it fires. An untelegraphed
@@ -520,6 +571,7 @@ window.RV = window.RV || {};
     else { ctx.fillStyle = "#4a7a37"; ctx.fillRect(0, 0, W, H); }
 
     drawSwamp();
+    drawWrecks();
     drawNoBuild();
     drawGhost();
     drawStrike();
