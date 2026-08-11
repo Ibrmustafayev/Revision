@@ -13,12 +13,14 @@ window.RV = window.RV || {};
     ROWS: 10,
     ROAD: 50,
     NO_BUILD: 2.4,      // radius, in cells, around each spawn where you can't build
-    START_GOLD: 520,
+    START_GOLD: 420,
+    SWAMP_COLS: 4,        // the marsh runs down the left edge of every map
     SINK_WAVES: 2,        // waves an emplacement survives on swamp
     SUNK_LOCK: 1,         // waves the square stays unusable after it goes under
     SHORE_BASE: 0.70,     // shoring costs this share of everything invested...
     SHORE_FLAT: 50,       // ...plus a flat fee, so it always beats a fresh build
-    SHORE_STEP: 1.35      // and 35% more each time. Swamp is never a home.
+    SHORE_STEP: 1.45,     // and 45% more each time. Swamp is never a home.
+    REPAIR_STEP: 1.60     // every repair on the same emplacement costs 60% more
   };
   RV.CFG.W = RV.CFG.CELL * RV.CFG.COLS;   // 900
   RV.CFG.H = RV.CFG.CELL * RV.CFG.ROWS;   // 600
@@ -29,14 +31,11 @@ window.RV = window.RV || {};
      overlap from the junction onward — that IS the merge. */
   RV.MAPS = [
     { lanes: [ [[-1, 1], [3, 1], [3, 3], [8, 3], [8, 5], [15, 5]],
-               [[-1, 8], [3, 8], [3, 7], [8, 7], [8, 5], [15, 5]] ], exit: [14, 5],
-      swamp: [[5,5],[6,5],[7,5],[6,4],[7,4],[6,6],[7,6],[9,4],[9,6]] },
+               [[-1, 8], [3, 8], [3, 7], [8, 7], [8, 5], [15, 5]] ], exit: [14, 5] },
     { lanes: [ [[-1, 2], [2, 2], [2, 5], [6, 5], [6, 2], [10, 2], [10, 4], [15, 4]],
-               [[-1, 7], [4, 7], [4, 9], [8, 9], [8, 6], [10, 6], [10, 4], [15, 4]] ], exit: [14, 4],
-      swamp: [[8,4],[8,5],[9,3],[9,4],[9,5],[11,3],[11,5],[12,3],[12,5]] },
+               [[-1, 7], [4, 7], [4, 9], [8, 9], [8, 6], [10, 6], [10, 4], [15, 4]] ], exit: [14, 4] },
     { lanes: [ [[-1, 4], [3, 4], [3, 1], [7, 1], [7, 6], [15, 6]],
-               [[-1, 9], [3, 9], [3, 7], [7, 7], [7, 6], [15, 6]] ], exit: [14, 6],
-      swamp: [[5,5],[6,5],[5,6],[6,6],[6,4],[8,5],[9,5],[8,7],[9,7]] }
+               [[-1, 9], [3, 9], [3, 7], [7, 7], [7, 6], [15, 6]] ], exit: [14, 6] }
   ];
 
   /* ---- emplacements ------------------------------------------------ */
@@ -95,9 +94,9 @@ window.RV = window.RV || {};
   /* The Harvester hangs above the field and reaches down. Both strikes are
      telegraphed — an untelegraphed instant loss reads as arbitrary, not hard. */
   RV.STRIKES = {
-    zone: { from: 6,  chance: 0.38, warn: 2.6, span: 1,   damage: 0.55,
+    zone: { from: 4, chance: 0.68, warn: 2.4, span: 1,  damage: 0.78,
             label: "HARVEST BEAM" },
-    line: { from: 11, chance: 0.22, warn: 2.9, half: 34,  damage: 0.92,
+    line: { from: 8, chance: 0.45, warn: 2.7, half: 38, damage: 1.10,
             label: "LANCE BEAM" }
   };
 
@@ -243,26 +242,26 @@ window.RV = window.RV || {};
   RV.META = [
     { id: "purse",  name: "Deeper Purse",   max: 3,
       desc: "Begin each run with 90 more gold, per rank.",
-      cost: function (rank) { return 2 + rank * 2; } },
+      cost: function (rank) { return 5 + rank * 4; } },
     { id: "found",  name: "Reinforced Foundations", max: 2,
       desc: "Emplacements have 15% more health, per rank.",
-      cost: function (rank) { return 3 + rank * 3; } },
+      cost: function (rank) { return 8 + rank * 6; } },
     { id: "crews",  name: "Veteran Crews",  max: 2,
       desc: "Emplacements deal 10% more damage, per rank.",
-      cost: function (rank) { return 4 + rank * 4; } },
+      cost: function (rank) { return 11 + rank * 8; } },
     { id: "orders", name: "Standing Orders", max: 1,
       desc: "Begin every run with the Cryo emplacement unlocked.",
-      cost: function () { return 6; } },
+      cost: function () { return 16; } },
     { id: "fletch", name: "Master Fletcher", max: 1,
       desc: "Begin every run with the Lance emplacement unlocked.",
-      cost: function () { return 9; } },
+      cost: function () { return 26; } },
     { id: "draft",  name: "Wider Draft",    max: 1,
       desc: "Every revision draft offers a fourth card.",
-      cost: function () { return 12; } }
+      cost: function () { return 34; } }
   ];
 
   RV.sealsFor = function (wave, kills) {
-    return 1 + Math.floor(wave / 2) + Math.floor(kills / 130);
+    return 1 + Math.floor(wave / 3) + Math.floor(kills / 240);
   };
 
   /* ---- helpers ----------------------------------------------------- */
