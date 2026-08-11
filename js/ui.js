@@ -111,6 +111,7 @@ window.RV = window.RV || {};
       '<dt>Invested</dt><dd class="d-inv"></dd></dl>' +
       '<div class="modes" role="group" aria-label="Targeting priority"></div>' +
       '<p class="modehint"></p>' +
+      '<div class="swampbox"></div>' +
       '<div class="acts"><button class="up"></button><button class="rp"></button>' +
       '<button class="sl"></button></div>';
 
@@ -145,6 +146,25 @@ window.RV = window.RV || {};
     });
     for (var mi = 0; mi < RV.MODES.length; mi++)
       if (RV.MODES[mi].id === t.mode) host.querySelector(".modehint").textContent = RV.MODES[mi].hint;
+
+    var sbox = host.querySelector(".swampbox");
+    if (t.swamp) {
+      var sp = RV.Game.shorePrice(t);
+      sbox.className = "swampbox on" + (t.sinkIn <= 1 ? " urgent" : "");
+      sbox.innerHTML = '<p class="sw"></p><button class="shore"></button>';
+      sbox.querySelector(".sw").textContent = t.sinkIn <= 1
+        ? "Standing in swamp \u2014 goes under after this wave."
+        : "Standing in swamp \u2014 sinks in " + t.sinkIn + " waves.";
+      var shb = sbox.querySelector(".shore");
+      shb.textContent = "Shore up " + sp;
+      shb.disabled = S.G.gold < sp;
+      shb.addEventListener("click", function () {
+        if (RV.Game.shore(S.picked)) { syncHud(); drawPalette(); drawInspect(); }
+      });
+    } else {
+      sbox.className = "swampbox";
+      sbox.innerHTML = "";
+    }
 
     var ub = host.querySelector(".up"), rb = host.querySelector(".rp"), sb = host.querySelector(".sl");
     ub.textContent = up === null ? "Maxed" : "Upgrade " + up;
@@ -280,6 +300,7 @@ window.RV = window.RV || {};
     $("f-kills").textContent = S.G.kills;
     $("f-towers").textContent = S.G.built;
     $("f-lost").textContent = S.G.lost;
+    $("f-sunk").textContent = S.G.sunk || 0;
     $("f-cards").textContent = S.G.taken.length;
     $("f-curses").textContent = S.G.curses.length;
     $("f-contracts").textContent = S.G.contracts;
