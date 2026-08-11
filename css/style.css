@@ -253,3 +253,16 @@ footer{width:100%;max-width:1220px;margin-top:16px;padding-top:11px;border-top:1
   #inspect .modes{grid-template-columns:repeat(2,1fr)}
   #inspect .mode{font-size:11px;padding:8px 2px}
 }
+
+/* ═══ swamp ═══ */
+.swampbox{margin:0}
+.swampbox.on{border:1px solid rgba(140,200,160,.32);background:rgba(34,58,42,.5);
+  padding:9px 10px;margin:0 0 9px}
+.swampbox.on.urgent{border-color:rgba(200,67,59,.55);background:rgba(58,34,32,.5)}
+.swampbox .sw{margin:0 0 8px;font-size:10.5px;line-height:1.45;color:#a9c4a6}
+.swampbox.urgent .sw{color:#f0a79f}
+.swampbox .shore{width:100%;background:transparent;border:1px solid rgba(140,200,160,.5);
+  color:#a9dcb4;font-family:var(--mono);font-size:11px;padding:8px;letter-spacing:.06em;
+  cursor:pointer;transition:background .12s,color .12s}
+.swampbox .shore:hover:not(:disabled){background:rgba(140,200,160,.16);color:#dff3e2}
+.swampbox .shore:disabled{opacity:.4;cursor:not-allowed}
