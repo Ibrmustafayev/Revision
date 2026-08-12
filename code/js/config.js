@@ -41,19 +41,16 @@ window.RV = window.RV || {};
   /* ---- emplacements ------------------------------------------------ */
   RV.TOWERS = {
     cannon: {
-      name: "Bastion", cost: 80, range: 150, damage: 14, cooldown: 0.68,
-      shot: 470, hp: 130, color: "#d9a441",
-      blurb: "Steady stonework. Reliable at anything."
+      cost: 80, range: 150, damage: 14, cooldown: 0.68,
+      shot: 470, hp: 130, color: "#d9a441"
     },
     frost: {
-      name: "Cryo", cost: 120, range: 130, damage: 6, cooldown: 0.85,
-      shot: 410, hp: 95, color: "#7fc6e8", slow: 0.55, slowFor: 1.6,
-      blurb: "Slows what it hits by 45%, and strips wards."
+      cost: 120, range: 130, damage: 6, cooldown: 0.85,
+      shot: 410, hp: 95, color: "#7fc6e8", slow: 0.55, slowFor: 1.6
     },
     sniper: {
-      name: "Lance", cost: 190, range: 300, damage: 54, cooldown: 1.95,
-      shot: 1000, hp: 85, color: "#e2703a",
-      blurb: "Long reach, heavy hit, slow to cycle. Fragile."
+      cost: 190, range: 300, damage: 54, cooldown: 1.95,
+      shot: 1000, hp: 85, color: "#e2703a"
     }
   };
 
@@ -66,10 +63,10 @@ window.RV = window.RV || {};
 
   /* how each emplacement chooses among the enemies in range */
   RV.MODES = [
-    { id: "first",  label: "First",    hint: "Furthest along the road" },
-    { id: "last",   label: "Last",     hint: "Nearest the spawn" },
-    { id: "strong", label: "Toughest", hint: "Most remaining health" },
-    { id: "close",  label: "Closest",  hint: "Nearest to this emplacement" }
+    { id: "first" },
+    { id: "last" },
+    { id: "strong" },
+    { id: "close" }
   ];
 
   /* ---- enemies ----------------------------------------------------- */
@@ -94,10 +91,8 @@ window.RV = window.RV || {};
   /* The Harvester hangs above the field and reaches down. Both strikes are
      telegraphed — an untelegraphed instant loss reads as arbitrary, not hard. */
   RV.STRIKES = {
-    zone: { from: 4, chance: 0.68, warn: 2.4, span: 1,  damage: 0.78,
-            label: "HARVEST BEAM" },
-    line: { from: 8, chance: 0.45, warn: 2.7, half: 38, damage: 1.10,
-            label: "LANCE BEAM" }
+    zone: { from: 4, chance: 0.68, warn: 2.4, span: 1,  damage: 0.78, k: "strike.zone" },
+    line: { from: 8, chance: 0.45, warn: 2.7, half: 38, damage: 1.10, k: "strike.line" }
   };
 
   /* warlords alternate between two kits */
@@ -110,153 +105,104 @@ window.RV = window.RV || {};
 
   /* ---- revision cards ---------------------------------------------- */
   RV.CARDS = [
-    { id: "pierce", name: "Piercing Rounds",
-      gain: "Shots carry into one more target", toll: "",
-      desc: "Each projectile continues to a second enemy for half damage.",
+    { id: "pierce", k: "card.pierce",
       apply: function (S) { S.M.pierce += 1; } },
 
-    { id: "blood", name: "Blood Money",
-      gain: "Double gold per kill", toll: "Enemies move 15% faster",
-      desc: "The contract pays double. The contractors hurry.",
+    { id: "blood", k: "card.blood",
       apply: function (S) { S.M.gold *= 2; S.M.enemySpeed *= 1.15; } },
 
-    { id: "overclock", name: "Overclock",
-      gain: "+40% fire rate", toll: "20% less range",
-      desc: "Cycle faster, see less.",
+    { id: "overclock", k: "card.overclock",
       apply: function (S) { S.M.fireRate *= 1.4; S.M.range *= 0.8; } },
 
-    { id: "spotters", name: "Spotters",
-      gain: "+30% range", toll: "15% slower fire rate",
-      desc: "Reach further, cycle slower.",
+    { id: "spotters", k: "card.spotters",
       apply: function (S) { S.M.range *= 1.3; S.M.fireRate *= 0.85; } },
 
-    { id: "glass", name: "Glass Cannon",
-      gain: "+55% damage", toll: "Emplacements have 28% less health",
-      desc: "Everything hits harder. Nothing stands as long.",
+    { id: "glass", k: "card.glass",
       apply: function (S) { S.M.damage *= 1.55; S.M.towerHp *= 0.72; } },
 
-    { id: "fortify", name: "Fortify",
-      gain: "+45% emplacement health", toll: "12% less damage",
-      desc: "Thicker walls, duller teeth. Sappers hate it.",
+    { id: "fortify", k: "card.fortify",
       apply: function (S) { S.M.towerHp *= 1.45; S.M.damage *= 0.88; } },
 
-    { id: "masons", name: "Masons' Guild",
-      gain: "Repairs cost 60% less", toll: "",
-      desc: "A standing crew, paid by retainer.",
+    { id: "masons", k: "card.masons",
       apply: function (S) { S.M.repair *= 0.4; } },
 
-    { id: "scavenge", name: "Scavenger",
-      gain: "12% chance of 45 bonus gold on kill", toll: "",
-      desc: "Crews strip the wrecks between volleys.",
+    { id: "scavenge", k: "card.scavenge",
       apply: function (S) { S.M.scavenge += 0.12; } },
 
-    { id: "quarry", name: "Quarry Contract",
-      gain: "Everything costs 22% less", toll: "Enemies gain 12% health",
-      desc: "Build and upgrade cheaper, but they send sturdier stock.",
+    { id: "quarry", k: "card.quarry",
       apply: function (S) { S.M.cost *= 0.78; S.M.enemyHp *= 1.12; } },
 
-    { id: "chest", name: "War Chest",
-      gain: "+280 gold now", toll: "",
-      desc: "An advance against next season. Spend it well.",
+    { id: "chest", k: "card.chest",
       apply: function (S) { S.G.gold += 280; } },
 
-    { id: "coldiron", name: "Cold Iron",
-      gain: "Cryo shots deal triple damage", toll: "",
-      desc: "Sharpened frost. Wards fall faster.",
+    { id: "coldiron", k: "card.coldiron",
       apply: function (S) { S.M.frostDamage *= 3; } },
 
-    { id: "cryocoils", name: "Cryo Coils", unlock: "frost",
-      gain: "Unlocks the Cryo emplacement", toll: "",
-      desc: "Slows what it hits, and the only thing that strips a ward.",
+    { id: "cryocoils", k: "card.cryocoils", unlock: "frost",
       apply: function (S) { S.G.unlocked.frost = true; } },
 
-    { id: "longbarrel", name: "Long Barrel", unlock: "sniper",
-      gain: "Unlocks the Lance emplacement", toll: "",
-      desc: "One target at a time, from across the field.",
+    { id: "longbarrel", k: "card.longbarrel", unlock: "sniper",
       apply: function (S) { S.G.unlocked.sniper = true; } }
   ];
 
   /* ---- curse cards -------------------------------------------------- */
   /* Occasionally replace one draft slot. Big gain, permanent drawback. */
   RV.CURSES = [
-    { id: "bloodpact", name: "Blood Pact", curse: true,
-      gain: "+120% damage", toll: "Emplacements can never be repaired",
-      desc: "Signed in the field, in a hurry. The masons walk off the job.",
+    { id: "bloodpact", k: "card.bloodpact", curse: true,
       apply: function (S) { S.M.damage *= 2.2; S.M.noRepair = true; } },
 
-    { id: "ironprice", name: "The Iron Price", curse: true,
-      gain: "+85% range", toll: "Emplacements can never be sold",
-      desc: "What is built stays built, whether or not you still want it there.",
+    { id: "ironprice", k: "card.ironprice", curse: true,
       apply: function (S) { S.M.range *= 1.85; S.M.noSell = true; } },
 
-    { id: "hollow", name: "Hollow Ranks", curse: true,
-      gain: "Every draft offers one more card", toll: "A random emplacement falls each wave",
-      desc: "More counsel than you can afford, and a payroll you cannot meet.",
+    { id: "hollow", k: "card.hollow", curse: true,
       apply: function (S) { S.M.extraDraft += 1; S.M.waveDestroy = true; } },
 
-    { id: "scorched", name: "Scorched Earth", curse: true,
-      gain: "+140% gold from kills", toll: "All emplacements decay 7% each wave",
-      desc: "Burn the ground you stand on and sell the ash.",
+    { id: "scorched", k: "card.scorched", curse: true,
       apply: function (S) { S.M.gold *= 2.4; S.M.waveDecay += 0.07; } },
 
-    { id: "conscript", name: "Conscription", curse: true,
-      gain: "Everything costs 45% less", toll: "Enemies gain 30% health, permanently",
-      desc: "Cheap labour on both sides of the wall.",
+    { id: "conscript", k: "card.conscript", curse: true,
       apply: function (S) { S.M.cost *= 0.55; S.M.enemyHp *= 1.30; } }
   ];
 
   /* ---- wave contracts ------------------------------------------------ */
   /* Optional, offered before each wave. Accept for harder terms and better pay. */
   RV.CONTRACTS = [
-    { id: "march", name: "Forced March",
-      terms: "Enemies move 40% faster", pay: "Double gold this wave",
+    { id: "march", k: "ct.march",
       apply: function (W) { W.speed *= 1.4; W.gold *= 2; } },
 
-    { id: "iron", name: "Iron Stock",
-      terms: "Enemies have 65% more health", pay: "One extra revision",
+    { id: "iron", k: "ct.iron",
       apply: function (W) { W.hp *= 1.65; W.revisions += 1; } },
 
-    { id: "blackout", name: "Blackout",
-      terms: "Kills pay nothing this wave", pay: "Two extra revisions",
+    { id: "blackout", k: "ct.blackout",
       apply: function (W) { W.gold = 0; W.revisions += 2; } },
 
-    { id: "column", name: "Double Column",
-      terms: "Twice as many march", pay: "60% more gold this wave",
+    { id: "column", k: "ct.column",
       apply: function (W) { W.count *= 2; W.gold *= 1.6; } },
 
-    { id: "convoy", name: "Sappers' Convoy",
-      terms: "Half the column are sappers", pay: "150% more gold this wave",
+    { id: "convoy", k: "ct.convoy",
       apply: function (W) { W.sappers = true; W.gold *= 2.5; } },
 
-    { id: "vanguard", name: "Vanguard",
-      terms: "An extra warlord marches", pay: "One revision and 50% more gold",
+    { id: "vanguard", k: "ct.vanguard",
       apply: function (W) { W.extraBoss = true; W.revisions += 1; W.gold *= 1.5; } },
 
-    { id: "ward", name: "Warded Column",
-      terms: "Every enemy carries a ward", pay: "Double gold and one revision",
+    { id: "ward", k: "ct.ward",
       apply: function (W) { W.allWarded = true; W.gold *= 2; W.revisions += 1; } }
   ];
 
   /* ---- meta progression ---------------------------------------------- */
   /* Seals are earned per run and spent in the armoury between runs. */
   RV.META = [
-    { id: "purse",  name: "Deeper Purse",   max: 3,
-      desc: "Begin each run with 90 more gold, per rank.",
+    { id: "purse", k: "meta.purse", max: 3,
       cost: function (rank) { return 5 + rank * 4; } },
-    { id: "found",  name: "Reinforced Foundations", max: 2,
-      desc: "Emplacements have 15% more health, per rank.",
+    { id: "found", k: "meta.found", max: 2,
       cost: function (rank) { return 8 + rank * 6; } },
-    { id: "crews",  name: "Veteran Crews",  max: 2,
-      desc: "Emplacements deal 10% more damage, per rank.",
+    { id: "crews", k: "meta.crews", max: 2,
       cost: function (rank) { return 11 + rank * 8; } },
-    { id: "orders", name: "Standing Orders", max: 1,
-      desc: "Begin every run with the Cryo emplacement unlocked.",
+    { id: "orders", k: "meta.orders", max: 1,
       cost: function () { return 16; } },
-    { id: "fletch", name: "Master Fletcher", max: 1,
-      desc: "Begin every run with the Lance emplacement unlocked.",
+    { id: "fletch", k: "meta.fletch", max: 1,
       cost: function () { return 26; } },
-    { id: "draft",  name: "Wider Draft",    max: 1,
-      desc: "Every revision draft offers a fourth card.",
+    { id: "draft", k: "meta.draft", max: 1,
       cost: function () { return 34; } }
   ];
 
