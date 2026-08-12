@@ -24,37 +24,43 @@ window.RV = window.RV || {};
 
     var btn = $("start");
     btn.disabled = S.phase !== "build";
-    btn.textContent = S.phase === "wave"     ? "Wave " + S.G.wave + " running"
-                    : S.phase === "paused"   ? "Paused"
-                    : S.phase === "over"     ? "Run ended"
-                    : (S.phase === "draft" || S.phase === "stamping") ? "Choose a revision"
-                    : "Start wave " + (S.G.wave + 1);
+    btn.textContent = S.phase === "wave"   ? RV.t("btn.wave_running", {n: S.G.wave})
+                    : S.phase === "paused" ? RV.t("btn.paused")
+                    : S.phase === "over"   ? RV.t("btn.run_ended")
+                    : (S.phase === "draft" || S.phase === "stamping") ? RV.t("btn.choose")
+                    : RV.t("btn.start_wave", {n: S.G.wave + 1});
     $("pause").disabled = !(S.phase === "build" || S.phase === "wave" || S.phase === "paused");
   }
 
   /* ---- wave contract ---------------------------------------------------- */
   function drawContract() {
     var host = $("contract");
-    if (!S.contract) { host.innerHTML = '<p class="hint">No offer.</p>'; return; }
+    if (!S.contract) {
+      host.innerHTML = '<p class="hint"></p>';
+      host.firstChild.textContent = RV.t("contract.none");
+      return;
+    }
 
     if (S.takenContract) {
-      host.innerHTML = '<div class="signed"><span class="cn"></span>' +
-                       '<span class="ok">Signed \u2014 applies to the next wave</span></div>';
-      host.querySelector(".cn").textContent = S.takenContract.name;
+      host.innerHTML = '<div class="signed"><span class="cn"></span><span class="ok"></span></div>';
+      host.querySelector(".cn").textContent = RV.t(S.takenContract.k + ".name");
+      host.querySelector(".ok").textContent = RV.t("contract.signed");
       return;
     }
     if (S.phase !== "build") {
-      host.innerHTML = '<p class="hint">Offers arrive between waves.</p>';
+      host.innerHTML = '<p class="hint"></p>';
+      host.firstChild.textContent = RV.t("contract.between");
       return;
     }
 
     host.innerHTML =
       '<div class="cname"></div>' +
       '<p class="terms"></p><p class="pay"></p>' +
-      '<button class="sign">Sign the contract</button>';
-    host.querySelector(".cname").textContent = S.contract.name;
-    host.querySelector(".terms").textContent = "\u2212 " + S.contract.terms;
-    host.querySelector(".pay").textContent = "+ " + S.contract.pay;
+      '<button class="sign"></button>';
+    host.querySelector(".sign").textContent = RV.t("contract.sign");
+    host.querySelector(".cname").textContent = RV.t(S.contract.k + ".name");
+    host.querySelector(".terms").textContent = "\u2212 " + RV.t(S.contract.k + ".terms");
+    host.querySelector(".pay").textContent = "+ " + RV.t(S.contract.k + ".pay");
     host.querySelector(".sign").addEventListener("click", function () {
       if (RV.Game.signContract()) { drawContract(); syncHud(); }
     });
@@ -75,11 +81,13 @@ window.RV = window.RV || {};
       b.innerHTML = '<span class="row"><span class="nm"><span class="swatch"></span></span>' +
                     '<span class="ct"></span></span><span class="dt"></span>';
       b.querySelector(".swatch").style.background = spec.color;
-      b.querySelector(".nm").append(unlocked ? spec.name : "Locked");
+      b.querySelector(".nm").append(unlocked ? RV.t("tower." + id)
+                                             : RV.t("draft.locked_short"));
       b.querySelector(".ct").textContent = unlocked ? price : "\u2014";
       b.querySelector(".dt").textContent = unlocked
-        ? spec.blurb + " " + Math.round(spec.hp * S.M.towerHp) + " hp."
-        : "Earn this from a revision.";
+        ? RV.t("tower." + id + ".blurb") + " " +
+          RV.t("tower.hp", {n: Math.round(spec.hp * S.M.towerHp)})
+        : RV.t("draft.locked");
       b.addEventListener("click", function () {
         RV.Sfx.unlock(); RV.Sfx.ui();
         S.selected = S.selected === id ? null : id;
@@ -252,6 +260,30 @@ window.RV = window.RV || {};
     }, S.reduceMotion ? 0 : 460);
   }
 
+  function redrawLog() {
+    var log = $("log");
+    var taken = S.G ? S.G.taken : [];
+    if (!taken.length) {
+      log.innerHTML = '<p class="empty"></p>';
+      log.firstChild.textContent = RV.t("log.empty");
+      return;
+    }
+    log.innerHTML = "";
+    taken.forEach(function (id, i) {
+      var card = null;
+      RV.CARDS.concat(RV.CURSES).forEach(function (c) { if (c.id === id) card = c; });
+      if (!card) return;
+      var p = document.createElement("p");
+      if (card.curse) p.className = "cursed";
+      var em = document.createElement("i");
+      em.textContent = (card.curse ? "\u2020" : "R" + String(i + 1).padStart(2, "0")) + " ";
+      p.appendChild(em);
+      p.appendChild(document.createTextNode(RV.t(card.k + ".name")));
+      log.appendChild(p);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
   function logRevision(name, cursed) {
     var log = $("log");
     if (log.querySelector(".empty")) log.innerHTML = "";
@@ -336,6 +368,7 @@ window.RV = window.RV || {};
   RV.UI = {
     init: init, syncHud: syncHud, drawPalette: drawPalette, drawInspect: drawInspect,
     drawContract: drawContract, openDraft: openDraft, openGameOver: openGameOver,
+    redrawLog: redrawLog,
     openArmoury: openArmoury, drawArmoury: drawArmoury,
     paintBest: paintBest, resetPanels: resetPanels, bump: bump, $: $
   };
