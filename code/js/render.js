@@ -139,7 +139,8 @@ window.RV = window.RV || {};
       ctx.fillStyle = t.sinkIn <= 1 ? "rgba(200,67,59,.92)" : "rgba(140,200,160,.85)";
       ctx.font = "600 10px 'IBM Plex Mono',monospace";
       ctx.textAlign = "center";
-      ctx.fillText(t.sinkIn <= 1 ? "SINKING" : "SINKS IN " + t.sinkIn, t.x, t.y + 44 + settle);
+      ctx.fillText(t.sinkIn <= 1 ? RV.t("canvas.sinking")
+                                 : RV.t("canvas.sinks_in", {n: t.sinkIn}), t.x, t.y + 44 + settle);
       ctx.textAlign = "left";
       ctx.restore();
     }
@@ -509,7 +510,7 @@ window.RV = window.RV || {};
       ctx.fillStyle = "rgba(140,255,190," + pulse + ")";
       ctx.font = "600 15px 'IBM Plex Mono',monospace";
       ctx.textAlign = "center";
-      ctx.fillText("\u25B2 HARVESTER \u2014 " + k.cfg.label + " INCOMING", CFG.W / 2, 29);
+      ctx.fillText(RV.t("canvas.harvester", {label: RV.t(k.cfg.k)}), CFG.W / 2, 29);
       ctx.textAlign = "left";
     }
   }
@@ -655,7 +656,7 @@ window.RV = window.RV || {};
       ctx.fillRect(0, H - 30, W, 30);
       ctx.fillStyle = "rgba(232,220,192,.9)";
       ctx.font = "500 12px 'IBM Plex Mono',monospace";
-      ctx.fillText("BUILD PHASE \u2014 nothing may reach the gate", 12, H - 11);
+      ctx.fillText(RV.t("canvas.build"), 12, H - 11);
     }
     ctx.restore();
 
