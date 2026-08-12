@@ -33,7 +33,7 @@
     </div>
     <div class="frame"><canvas id="game" width="900" height="600" aria-label="Battlefield"></canvas></div>
     <div class="controls">
-      <button class="primary" id="start">Start wave 1</button>
+      <button class="primary" id="start"></button>
       <button class="ghost" id="speed">1&times;</button>
     </div>
   </div>
@@ -64,8 +64,8 @@
     <p class="mark">Revi<span>/</span>sion</p>
     <p class="tagline" data-i18n="title.tagline"></p>
     <div class="best">
-      <span><b data-i18n="title.best">Best run</b><br><s id="best-line">no runs recorded</s></span>
-      <span style="text-align:right"><b data-i18n="ui.armoury">Armoury</b><br><s id="seal-line">0 seals</s></span>
+      <span><b data-i18n="title.best">Best run</b><br><s id="best-line"></s></span>
+      <span style="text-align:right"><b data-i18n="ui.armoury">Armoury</b><br><s id="seal-line"></s></span>
     </div>
     <div class="title-acts">
       <button class="primary" id="begin" data-i18n="ui.begin">Begin the plan</button>
@@ -140,7 +140,7 @@
 <div class="veil" id="draft" hidden>
   <div class="veil-inner">
     <h2 data-i18n="draft.title">Wave held</h2>
-    <p class="lede" id="draft-sub">Issue one revision to the plan.</p>
+    <p class="lede" id="draft-sub"></p>
     <div class="cards" id="draft-cards"></div>
   </div>
 </div>
@@ -149,8 +149,8 @@
 <div class="veil" id="over" hidden>
   <div class="veil-inner" style="max-width:420px">
     <div class="sheet">
-      <h2 id="over-title">The gate fell</h2>
-      <p class="lede" id="over-lede">One of them walked through. That is all it takes.</p>
+      <h2 id="over-title"></h2>
+      <p class="lede" id="over-lede"></p>
       <p class="record" id="record" hidden data-i18n="over.record">New best run</p>
       <dl>
         <dt data-i18n="over.waves">Waves cleared</dt><dd class="big" id="f-wave">0</dd>
