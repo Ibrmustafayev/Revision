@@ -95,8 +95,8 @@ window.RV = window.RV || {};
     var host = $("inspect");
     var t = S.picked;
     if (!t) {
-      host.innerHTML = '<p class="hint">Click a built emplacement to retarget, upgrade, ' +
-                       'repair or sell it. Damaged emplacements sell for less.</p>';
+      host.innerHTML = '<p class="hint"></p>';
+      host.firstChild.textContent = RV.t("inspect.hint");
       return;
     }
     var spec = RV.TOWERS[t.type], st = RV.Game.towerStats(t);
@@ -105,19 +105,24 @@ window.RV = window.RV || {};
     host.innerHTML =
       '<div class="hd"><span class="tn"></span><span class="tier"></span></div>' +
       '<div class="cond"><div class="bar"><i></i></div><span class="pct"></span></div>' +
-      '<dl><dt>Damage</dt><dd class="d-dmg"></dd>' +
-      '<dt>Range</dt><dd class="d-rng"></dd>' +
-      '<dt>Cycle</dt><dd class="d-cyc"></dd>' +
-      '<dt>Invested</dt><dd class="d-inv"></dd></dl>' +
-      '<div class="modes" role="group" aria-label="Targeting priority"></div>' +
+      '<dl><dt class="l-dmg"></dt><dd class="d-dmg"></dd>' +
+      '<dt class="l-rng"></dt><dd class="d-rng"></dd>' +
+      '<dt class="l-cyc"></dt><dd class="d-cyc"></dd>' +
+      '<dt class="l-inv"></dt><dd class="d-inv"></dd></dl>' +
+      '<div class="modes" role="group"></div>' +
       '<p class="modehint"></p>' +
       '<div class="swampbox"></div>' +
       '<div class="acts"><button class="up"></button><button class="rp"></button>' +
       '<button class="sl"></button></div>';
 
-    host.querySelector(".tn").textContent = spec.name;
+    host.querySelector(".modes").setAttribute("aria-label", RV.t("inspect.targeting"));
+    host.querySelector(".l-dmg").textContent = RV.t("inspect.damage");
+    host.querySelector(".l-rng").textContent = RV.t("inspect.range");
+    host.querySelector(".l-cyc").textContent = RV.t("inspect.cycle");
+    host.querySelector(".l-inv").textContent = RV.t("inspect.invested");
+    host.querySelector(".tn").textContent = RV.t("tower." + t.type);
     host.querySelector(".tn").style.color = spec.color;
-    host.querySelector(".tier").textContent = "TIER " + t.tier + " / 3";
+    host.querySelector(".tier").textContent = RV.t("inspect.tier", {n: t.tier});
 
     var fill = host.querySelector(".bar i");
     fill.style.width = Math.round(t.hpPct * 100) + "%";
@@ -135,7 +140,7 @@ window.RV = window.RV || {};
     RV.MODES.forEach(function (m) {
       var mb = document.createElement("button");
       mb.className = "mode";
-      mb.textContent = m.label;
+      mb.textContent = RV.t("mode." + m.id);
       mb.setAttribute("aria-pressed", String(t.mode === m.id));
       mb.addEventListener("click", function () {
         t.mode = m.id;
@@ -145,7 +150,8 @@ window.RV = window.RV || {};
       modes.appendChild(mb);
     });
     for (var mi = 0; mi < RV.MODES.length; mi++)
-      if (RV.MODES[mi].id === t.mode) host.querySelector(".modehint").textContent = RV.MODES[mi].hint;
+      if (RV.MODES[mi].id === t.mode)
+        host.querySelector(".modehint").textContent = RV.t("mode." + t.mode + ".hint");
 
     var sbox = host.querySelector(".swampbox");
     if (t.swamp) {
@@ -153,10 +159,9 @@ window.RV = window.RV || {};
       sbox.className = "swampbox on" + (t.sinkIn <= 1 ? " urgent" : "");
       sbox.innerHTML = '<p class="sw"></p><button class="shore"></button>';
       sbox.querySelector(".sw").textContent = t.sinkIn <= 1
-        ? "Standing in swamp \u2014 goes under after this wave."
-        : "Standing in swamp \u2014 sinks in " + t.sinkIn + " waves.";
+        ? RV.t("swamp.sinking") : RV.t("swamp.sinks_in", {n: t.sinkIn});
       var shb = sbox.querySelector(".shore");
-      shb.textContent = "Shore up " + sp;
+      shb.textContent = RV.t("swamp.shore", {n: sp});
       shb.disabled = S.G.gold < sp;
       shb.addEventListener("click", function () {
         if (RV.Game.shore(S.picked)) { syncHud(); drawPalette(); drawInspect(); }
@@ -167,19 +172,20 @@ window.RV = window.RV || {};
     }
 
     var ub = host.querySelector(".up"), rb = host.querySelector(".rp"), sb = host.querySelector(".sl");
-    ub.textContent = up === null ? "Maxed" : "Upgrade " + up;
+    ub.textContent = up === null ? RV.t("inspect.maxed") : RV.t("inspect.upgrade", {n: up});
     ub.disabled = up === null || S.G.gold < up;
     ub.addEventListener("click", function () {
       if (RV.Game.upgrade(S.picked)) { syncHud(); drawPalette(); drawInspect(); }
     });
 
-    rb.textContent = S.M.noRepair ? "Cursed" : rp === null ? "Intact" : "Repair " + rp;
+    rb.textContent = S.M.noRepair ? RV.t("inspect.cursed")
+                   : rp === null ? RV.t("inspect.intact") : RV.t("inspect.repair", {n: rp});
     rb.disabled = rp === null || S.G.gold < rp;
     rb.addEventListener("click", function () {
       if (RV.Game.repair(S.picked)) { syncHud(); drawPalette(); drawInspect(); }
     });
 
-    sb.textContent = sv === null ? "Cursed" : "Sell " + sv;
+    sb.textContent = sv === null ? RV.t("inspect.cursed") : RV.t("inspect.sell", {n: sv});
     sb.disabled = sv === null;
     sb.addEventListener("click", function () {
       if (RV.Game.sell(S.picked)) { syncHud(); drawPalette(); drawInspect(); }
@@ -196,7 +202,7 @@ window.RV = window.RV || {};
     /* from wave 4 onward, one slot may be replaced by a curse */
     if (S.G.wave >= 4 && Math.random() < 0.28 && picks.length) {
       var curse = RV.pick(RV.CURSES);
-      var seen = S.G.taken.indexOf(curse.name) === -1;
+      var seen = S.G.taken.indexOf(curse.id) === -1;
       if (seen) picks[(Math.random() * picks.length) | 0] = curse;
     }
 
@@ -204,8 +210,8 @@ window.RV = window.RV || {};
     host.innerHTML = "";
     host.className = "cards" + (slots > 3 ? " wide" : "");
     $("draft-sub").textContent = S.pendingDrafts > 1
-      ? "Wave " + S.G.wave + " held. " + S.pendingDrafts + " revisions owed \u2014 issue one."
-      : "Wave " + S.G.wave + " held. Issue one revision to the plan.";
+      ? RV.t("draft.sub_many", {n: S.G.wave, c: S.pendingDrafts})
+      : RV.t("draft.sub", {n: S.G.wave});
 
     picks.forEach(function (card) {
       var el = document.createElement("button");
@@ -213,11 +219,13 @@ window.RV = window.RV || {};
       el.innerHTML = '<span class="rev"></span><span class="nm"></span><span class="ds"></span>' +
                      '<span class="terms"><span class="gain"></span><span class="toll"></span></span>';
       el.querySelector(".rev").textContent = card.curse
-        ? "Curse" : "Revision " + String(S.revision + 1).padStart(2, "0");
-      el.querySelector(".nm").textContent = card.name;
-      el.querySelector(".ds").textContent = card.desc;
-      el.querySelector(".gain").textContent = "+ " + card.gain;
-      el.querySelector(".toll").textContent = card.toll ? "\u2212 " + card.toll : "";
+        ? RV.t("draft.curse")
+        : RV.t("draft.revision", {n: String(S.revision + 1).padStart(2, "0")});
+      el.querySelector(".nm").textContent = RV.t(card.k + ".name");
+      el.querySelector(".ds").textContent = RV.t(card.k + ".desc");
+      el.querySelector(".gain").textContent = "+ " + RV.t(card.k + ".gain");
+      var toll = RV.t(card.k + ".toll");
+      el.querySelector(".toll").textContent = toll ? "\u2212 " + toll : "";
       el.addEventListener("click", function () { takeCard(card, el); });
       host.appendChild(el);
     });
@@ -229,7 +237,7 @@ window.RV = window.RV || {};
   function takeCard(card, el) {
     if (!RV.Game.takeCard(card)) return;
     if (el) el.classList.add("stamped");
-    logRevision(card.name, card.curse);
+    logRevision(RV.t(card.k + ".name"), card.curse);
     setTimeout(function () {
       $("draft").hidden = true;
       if (RV.Game.consumeDraft()) {
@@ -277,11 +285,11 @@ window.RV = window.RV || {};
       row.innerHTML =
         '<div class="ui-top"><span class="un"></span><span class="ur"></span></div>' +
         '<p class="ud"></p><button class="buy"></button>';
-      row.querySelector(".un").textContent = u.name;
+      row.querySelector(".un").textContent = RV.t(u.k + ".name");
       row.querySelector(".ur").textContent = rank + " / " + u.max;
-      row.querySelector(".ud").textContent = u.desc;
+      row.querySelector(".ud").textContent = RV.t(u.k + ".desc");
       var buy = row.querySelector(".buy");
-      buy.textContent = maxed ? "Complete" : price + " seals";
+      buy.textContent = maxed ? RV.t("armoury.complete") : RV.t("armoury.cost", {n: price});
       buy.disabled = maxed || RV.Store.seals() < price;
       buy.addEventListener("click", function () {
         if (RV.Store.buy(u.id)) { RV.Sfx.upgrade(); drawArmoury(); paintBest(); }
@@ -292,10 +300,8 @@ window.RV = window.RV || {};
 
   /* ---- end of run ----------------------------------------------------------- */
   function openGameOver(cleared, result, breached) {
-    $("over-title").textContent = breached ? "The gate fell" : "Run abandoned";
-    $("over-lede").textContent = breached
-      ? "One of them walked through. That is all it takes."
-      : "You called it off.";
+    $("over-title").textContent = RV.t(breached ? "over.gate_fell" : "over.abandoned");
+    $("over-lede").textContent = RV.t(breached ? "over.lede_breach" : "over.lede_abandon");
     $("f-wave").textContent = cleared;
     $("f-kills").textContent = S.G.kills;
     $("f-towers").textContent = S.G.built;
@@ -314,14 +320,15 @@ window.RV = window.RV || {};
   function paintBest() {
     var b = RV.Store.best();
     $("best-line").textContent = b
-      ? "wave " + b.wave + " \u00b7 " + b.kills + " kills"
-      : "no runs recorded";
-    $("seal-line").textContent = RV.Store.seals() + " seals";
+      ? RV.t("hud.wave") + " " + b.wave + " \u00b7 " + b.kills + " " + RV.t("hud.kills")
+      : RV.t("title.no_runs");
+    $("seal-line").textContent = RV.t("armoury.cost", {n: RV.Store.seals()});
   }
 
   function resetPanels() {
     ["draft", "over", "paused", "help", "armoury"].forEach(function (id) { $(id).hidden = true; });
-    $("log").innerHTML = '<p class="empty">No amendments yet. Hold a wave to earn one.</p>';
+    $("log").innerHTML = '<p class="empty"></p>';
+    $("log").firstChild.textContent = RV.t("log.empty");
     $("speed").textContent = "1\u00d7";
     drawPalette(); drawInspect(); drawContract(); syncHud();
   }
