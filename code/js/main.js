@@ -15,6 +15,39 @@ window.RV = window.RV || {};
   RV.Render.init(ctx);
   RV.UI.init();
 
+  /* ---- language ---------------------------------------------------------- */
+  function buildLangPicker() {
+    var host = $("langs");
+    host.innerHTML = "";
+    RV.LANGS.forEach(function (L) {
+      var b = document.createElement("button");
+      b.className = "lang";
+      b.textContent = L.label;
+      b.title = L.name;
+      b.setAttribute("aria-pressed", String(RV.getLang() === L.id));
+      b.addEventListener("click", function () {
+        if (RV.getLang() === L.id) return;
+        RV.setLang(L.id);
+        buildLangPicker();
+        relabel();
+        RV.Sfx.ui();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  /* Static nodes are handled by RV.applyStatic; these are the ones drawn
+     from JS and so have to be rebuilt by hand. */
+  function relabel() {
+    $("mute").textContent = RV.t(RV.Sfx.isMuted() ? "ui.sound_off" : "ui.sound_on");
+    RV.UI.paintBest();
+    refresh();
+    if (!$("armoury").hidden) RV.UI.drawArmoury();
+  }
+
+  RV.setLang(RV.detectLang());
+  buildLangPicker();
+
   function refresh() {
     RV.UI.syncHud(); RV.UI.drawPalette();
     RV.UI.drawInspect(); RV.UI.drawContract();
@@ -129,7 +162,7 @@ window.RV = window.RV || {};
     $("armoury").hidden = true; RV.Sfx.ui();
   });
   $("wipe").addEventListener("click", function () {
-    if (window.confirm("Erase all seals, upgrades and your best run?")) {
+    if (window.confirm(RV.t("ui.wipe_confirm"))) {
       RV.Store.wipe();
       RV.UI.drawArmoury();
       RV.UI.paintBest();
@@ -138,7 +171,7 @@ window.RV = window.RV || {};
 
   $("mute").addEventListener("click", function () {
     var m = RV.Sfx.toggle();
-    $("mute").textContent = m ? "Sound off" : "Sound on";
+    $("mute").textContent = RV.t(m ? "ui.sound_off" : "ui.sound_on");
     $("mute").setAttribute("aria-pressed", String(m));
     if (!m) { RV.Sfx.unlock(); RV.Sfx.ui(); }
   });
@@ -194,6 +227,7 @@ window.RV = window.RV || {};
   RV.Game.reset();
   RV.UI.resetPanels();
   S.phase = "title";
+  RV.applyStatic();
   RV.UI.paintBest();
   RV.UI.syncHud();
   requestAnimationFrame(frame);
