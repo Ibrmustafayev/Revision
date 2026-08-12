@@ -207,7 +207,7 @@ window.RV = window.RV || {};
     }
     if (S.M.waveDestroy && S.towers.length) {
       var victim = (Math.random() * S.towers.length) | 0;
-      addFloat(S.towers[victim].x, S.towers[victim].y - 34, "CONSCRIPTED", "#c8433b", 1.3, 12);
+      addFloat(S.towers[victim].x, S.towers[victim].y - 34, RV.t("float.conscripted"), "#c8433b", 1.3, 12);
       destroyTower(victim);
     }
 
@@ -356,7 +356,7 @@ window.RV = window.RV || {};
                     bits: makeWreckBits() });
     burst(t.x, t.y + 10, 24, "#4b6b45", 3, 90);
     burst(t.x, t.y + 10, 14, "#8fb08a", 2.4, 140);
-    addFloat(t.x, t.y - 30, "SWALLOWED", "#6f8f5a", 1.3, 13);
+    addFloat(t.x, t.y - 30, RV.t("float.swallowed"), "#6f8f5a", 1.3, 13);
     if (S.picked === t) S.picked = null;
     S.towers.splice(index, 1);
     S.G.lost++;
@@ -387,7 +387,7 @@ window.RV = window.RV || {};
     t.shored = (t.shored || 0) + 1;
     t.sinkIn = CFG.SINK_WAVES;   /* a full two waves again, every time */
     RV.Sfx.repair();
-    addFloat(t.x, t.y - 30, "SHORED UP", "#8dc26f", 1.0, 12);
+    addFloat(t.x, t.y - 30, RV.t("float.shored"), "#8dc26f", 1.0, 12);
     return true;
   }
 
@@ -407,13 +407,13 @@ window.RV = window.RV || {};
       t.stunUntil = Math.max(t.stunUntil, S.tick + spec.empStun);
       hit_++;
     }
-    if (hit_) addFloat(e.x, e.y - 34, hit_ + " SILENCED", "#5fd6c0", 1.1, 13);
+    if (hit_) addFloat(e.x, e.y - 34, RV.t("float.silenced", {n: hit_}), "#5fd6c0", 1.1, 13);
   }
 
   function destroyTower(index) {
     var t = S.towers[index];
     burst(t.x, t.y, 22, "#8a8578", 3, 150);
-    addFloat(t.x, t.y - 30, "DESTROYED", "#c8433b", 1.1, 13);
+    addFloat(t.x, t.y - 30, RV.t("float.destroyed"), "#c8433b", 1.1, 13);
     if (S.picked === t) S.picked = null;
     S.towers.splice(index, 1);
     S.G.lost++;
@@ -430,7 +430,7 @@ window.RV = window.RV || {};
       /* Cryo is the only thing that strips a ward */
       e.wardBrokenUntil = S.tick + ENEMIES.warded.wardDown;
       warded = false;
-      addFloat(e.x, e.y - e.r - 16, "WARD BROKEN", "#7fc6e8", 0.85, 11);
+      addFloat(e.x, e.y - e.r - 16, RV.t("float.ward"), "#7fc6e8", 0.85, 11);
       burst(e.x, e.y, 10, "#7fc6e8", 2.5, 110);
     }
     if (warded) dmg *= ENEMIES.warded.wardCut;
@@ -566,7 +566,7 @@ window.RV = window.RV || {};
       }
       if (target) {
         target.stunUntil = S.tick + kit.stun;
-        addFloat(target.x, target.y - 34, "SILENCED", "#c86fd0", 1.0, 12);
+        addFloat(target.x, target.y - 34, RV.t("float.silenced", {n: 1}), "#c86fd0", 1.0, 12);
         S.rings.push({ x: e.x, y: e.y, r: 8, max: bestD, life: 0.35, maxLife: 0.35, color: "#c86fd0" });
         RV.Sfx.ui();
       }
@@ -754,8 +754,8 @@ window.RV = window.RV || {};
     S.phase = "stamping";
     card.apply(S);
     S.revision++;
-    S.G.taken.push(card.name);
-    if (card.curse) S.G.curses.push(card.name);
+    S.G.taken.push(card.id);
+    if (card.curse) S.G.curses.push(card.id);
     RV.Sfx.stamp();
     return true;
   }
@@ -801,7 +801,7 @@ window.RV = window.RV || {};
     t.spent += price;
     t.tier++;
     RV.Sfx.upgrade();
-    addFloat(t.x, t.y - 28, "TIER " + t.tier, "#d9a441", 0.95, 13);
+    addFloat(t.x, t.y - 28, RV.t("float.tier", {n: t.tier}), "#d9a441", 0.95, 13);
     return true;
   }
 
@@ -814,7 +814,7 @@ window.RV = window.RV || {};
     t.repairs = (t.repairs || 0) + 1;
     t.hpPct = 1;
     RV.Sfx.repair();
-    addFloat(t.x, t.y - 28, "REPAIRED", "#8dc26f", 0.95, 12);
+    addFloat(t.x, t.y - 28, RV.t("float.repaired"), "#8dc26f", 0.95, 12);
     return true;
   }
 
