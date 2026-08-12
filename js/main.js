@@ -42,7 +42,10 @@ window.RV = window.RV || {};
     $("mute").textContent = RV.t(RV.Sfx.isMuted() ? "ui.sound_off" : "ui.sound_on");
     RV.UI.paintBest();
     refresh();
+    RV.UI.redrawLog();
     if (!$("armoury").hidden) RV.UI.drawArmoury();
+    /* a draft open mid-switch would otherwise keep the old language's cards */
+    if (!$("draft").hidden) RV.UI.openDraft();
   }
 
   RV.setLang(RV.detectLang());
